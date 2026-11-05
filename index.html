@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reach Traineeship Enrolment Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+:root{--navy:#17365d;--blue:#2164a5;--bg:#f4f7fb;--line:#dce4ee;--muted:#63748a;--green:#e4f5e9;--greenText:#176b35;--red:#fde9e7;--redText:#a52b22}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Inter,Arial,sans-serif;color:#172b45}
+header{background:linear-gradient(110deg,#17365d,#23649a);color:#fff;padding:22px max(22px,calc((100vw - 1250px)/2));}
+header h1{font-size:22px;margin:0 0 6px}header p{margin:0;color:#dce9f6;font-size:13px}
+main{max-width:1250px;margin:24px auto;padding:0 18px}
+.toolbar,.panel,.learner-card{background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:0 2px 8px #17365d0a}
+.toolbar{padding:15px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+input,select,textarea{font:inherit;border:1px solid #cbd6e3;border-radius:8px;padding:10px 11px;background:white;color:#172b45;min-width:0}
+input:focus,select:focus,textarea:focus{outline:2px solid #b9d7f5;border-color:#4e8bc6}
+#search{flex:1;min-width:210px}
+button{font:inherit;border:0;border-radius:8px;padding:10px 14px;background:var(--blue);color:white;font-weight:600;cursor:pointer}
+button:hover{filter:brightness(.94)}button.secondary{background:#eaf1f8;color:#24496e}button.danger{background:#fff0ef;color:#a52b22}button:disabled{opacity:.5;cursor:not-allowed}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px}.stat small{color:var(--muted);display:block;margin-bottom:5px}.stat strong{font-size:24px;color:var(--navy)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.learner-card{padding:16px;min-width:0}.learner-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.learner-head h3{margin:0 0 5px;font-size:17px}.meta{font-size:12px;color:var(--muted);line-height:1.6}
+.pill{font-size:11px;font-weight:700;border-radius:20px;padding:5px 9px;background:#edf2f8;color:#3d5875;white-space:nowrap}
+.progress-row{display:flex;justify-content:space-between;font-size:12px;margin:14px 0 6px;color:#51657c}
+.progress{height:8px;background:#edf1f5;border-radius:20px;overflow:hidden}.progress span{display:block;height:100%;background:#25965a;border-radius:20px}
+.step-list{display:grid;grid-template-columns:1fr;gap:7px;margin-top:14px}
+.step{border:1px solid #e5ebf2;border-radius:9px;padding:9px 10px;display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:start}
+.step input{margin:2px 0 0;width:17px;height:17px;accent-color:#23864d}
+.step label{font-size:12px;font-weight:600;line-height:1.35;cursor:pointer}.step small{display:block;font-weight:400;color:var(--muted);margin-top:3px;line-height:1.4}
+.step.done{background:#f2faf4;border-color:#d6eedc}.step.done label{color:#1b6535}
+.step-extra{grid-column:2;display:flex;gap:7px;flex-wrap:wrap;margin-top:5px}.step-extra input{font-size:11px;padding:6px 7px}.step-extra input[type=date]{width:140px}.step-extra input[type=text]{flex:1;min-width:130px}
+.card-actions{display:flex;gap:8px;margin-top:13px;justify-content:flex-end}
+.panel{padding:20px;max-width:760px;margin:24px auto}.panel h2{margin:0 0 15px;font-size:19px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:12px;color:#53677d;font-weight:600}.field.full{grid-column:1/-1}
+.empty{text-align:center;padding:45px 15px;color:var(--muted);background:white;border:1px dashed #cbd6e3;border-radius:12px}
+#login{max-width:440px;margin:70px auto}.hint{font-size:12px;color:var(--muted);line-height:1.5}.hidden{display:none!important}
+footer{max-width:1250px;margin:25px auto;padding:0 18px 28px;color:#748398;font-size:11px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.toolbar button{flex:1}}
+</style>
+</head>
+<body>
+<header><h1>Reach Traineeship Enrolment Tracker</h1><p>Track every learner through the 11-step traineeship enrolment process.</p></header>
+<main>
+<section id="login" class="panel hidden">
+<p id="loginMsg" class="hint"></p>
+</section>
+<section id="app" class="hidden">
+<div class="stats">
+<div class="stat"><small>Total learners</small><strong id="totalCount">0</strong></div>
+<div class="stat"><small>All steps completed</small><strong id="completedCount">0</strong></div>
+<div class="stat"><small>In progress</small><strong id="progressCount">0</strong></div>
+<div class="stat"><small>Average progress</small><strong id="averageCount">0%</strong></div>
+</div>
+<div class="toolbar">
+<input id="search" placeholder="Search learner name or ID…">
+<select id="filter"><option value="all">All learners</option><option value="notstarted">Not started</option><option value="progress">In progress</option><option value="completed">Completed</option></select>
+<button id="addBtn">+ Add learner</button>
+<button id="xlsxBtn" class="secondary">Export Excel</button>
+<button id="csvBtn" class="secondary">Export CSV</button>
+<button id="refreshBtn" class="secondary">Refresh</button>
+<button id="logoutBtn" class="danger">Sign out</button>
+</div>
+<div id="learnerGrid" class="grid"></div>
+</section>
+<section id="editor" class="panel hidden">
+<h2 id="editorTitle">Add learner</h2>
+<div class="form-grid">
+<div class="field"><label>Learner name *</label><input id="learnerName" required placeholder="Full name"></div>
+<div class="field"><label>Learner ID / CID</label><input id="learnerId" placeholder="Optional"></div>
+<div class="field"><label>Start date</label><input id="startDate" type="date"></div>
+<div class="field"><label>End date</label><input id="endDate" type="date"></div>
+<div class="field"><label>Training Coordinator</label><input id="coordinator" placeholder="Name"></div>
+<div class="field"><label>Trainer</label><input id="trainer" placeholder="Name"></div>
+<div class="field full"><label>General notes</label><textarea id="learnerNotes" rows="3" placeholder="Add learner-specific notes…"></textarea></div>
+</div>
+<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="secondary" id="cancelEdit">Cancel</button><button id="saveLearner">Save learner</button></div>
+<p id="saveMsg" class="hint"></p>
+</section>
+</main>
+<footer>Public link access is enabled: anyone who has the website link may view, add, edit or delete learner records. Do not store confidential or personally identifying learner information in this public version. Exported CSV files contain ✓ and ✗ values; CSV cannot store cell colours. Use Export Excel for a colour-formatted workbook.</footer>
+<script src="./config.js"></script>
+<script>
+const STEP_DATA = [
+["Initial Contact","TC/IT establishes contact and creates the contact in HubSpot or creates the employer and sends the sign-up sheet to the employer from HubSpot."],
+["Sign-Up Sheet – To be sent to ACC","The college (Traineeship Manager/TC) sends the completed sign-up sheet to the ACC for the process of signing up the learner. Update the HubSpot status."],
+["Send Enrolment Link","TC/IT sends the online enrolment link from the HubSpot template."],
+["Send LLND Link","TC/IT sends the LLND link for industry."],
+["Await TCID Approval and upon TCID Approval","TC/IT waits for TCID approval; once TCID is received (Traineeship Manager/TC) uploads TTP in HubSpot and updates status to “TCID Approved”."],
+["Receive Registration / Accept Enrolment","TC/IT receives the registration form. TC/IT accepts enrolment and verifies documents."],
+["Mark LLND","Trainer marks LLND and updates the TC / IT."],
+["Upload Results","TC/IT uploads LLND results and feedback to the learner profile in SMS."],
+["Get in touch with Trainer for the date of visit","Traineeship Manager or TC liaises with the Trainer to lock in the first date of visit – convey the actual start date to the IT."],
+["Fill out Form on RFS","Traineeship Manager/TC/IT completes the “Training Plan & Contract Creation Request”."],
+["Complete Commitment ID Form on RFS","TC/IT completes the Commitment ID Form."]
+];
+const emptySteps=()=>STEP_DATA.map(()=>({done:false,date:"",note:""}));
+let supabase=null, learners=[], editingId=null, currentUser=null;
+const $=id=>document.getElementById(id);
+function setupClient(){if(!window.TRACKER_CONFIG?.SUPABASE_URL||!window.TRACKER_CONFIG?.SUPABASE_ANON_KEY||window.TRACKER_CONFIG.SUPABASE_URL.includes("YOUR_"))return false;supabase=window.supabase.createClient(TRACKER_CONFIG.SUPABASE_URL,TRACKER_CONFIG.SUPABASE_ANON_KEY);return true}
+function showLogin(msg=""){ $("login").classList.remove("hidden");$("app").classList.add("hidden");$("editor").classList.add("hidden");$("loginMsg").textContent=msg}
+function showApp(){ $("login").classList.add("hidden");$("app").classList.remove("hidden");$("editor").classList.add("hidden")}
+function esc(s=""){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+async function signIn(){return}
+async function init(){if(!setupClient()){showLogin("Setup required: add the Supabase project URL and anon key to config.js. See README.");return}await loadLearners()}
+async function loadLearners(){const {data,error}=await supabase.from("traineeship_learners").select("*").order("created_at",{ascending:false});if(error){showLogin("Could not load shared learners: "+error.message);return}learners=(data||[]).map(x=>({...x,steps:Array.isArray(x.steps)?x.steps:emptySteps()}));showApp();render()}
+function stats(){const total=learners.length,done=learners.filter(l=>l.steps.every(s=>s.done)).length,started=learners.filter(l=>l.steps.some(s=>s.done)&&!l.steps.every(s=>s.done)).length,avg=total?Math.round(learners.reduce((a,l)=>a+l.steps.filter(s=>s.done).length/11,0)/total*100):0;$("totalCount").textContent=total;$("completedCount").textContent=done;$("progressCount").textContent=started;$("averageCount").textContent=avg+"%"}
+function render(){stats();const q=$("search").value.toLowerCase(),f=$("filter").value;const shown=learners.filter(l=>{const n=(l.learner_name+" "+(l.learner_id||"")).toLowerCase();const count=l.steps.filter(s=>s.done).length;return n.includes(q)&&(f==="all"||(f==="notstarted"&&count===0)||(f==="progress"&&count>0&&count<11)||(f==="completed"&&count===11))});if(!shown.length){$("learnerGrid").innerHTML='<div class="empty" style="grid-column:1/-1">No learners found. Add a learner to get started.</div>';return}
+$("learnerGrid").innerHTML=shown.map(l=>{const n=l.steps.filter(s=>s.done).length,p=Math.round(n/11*100),status=n===11?"Completed":n===0?"Not started":"In progress";return `<article class="learner-card" data-id="${l.id}"><div class="learner-head"><div><h3>${esc(l.learner_name)}</h3><div class="meta">ID/CID: ${esc(l.learner_id||"—")}<br>Start: ${esc(l.start_date||"—")} · End: ${esc(l.end_date||"—")}<br>Coordinator: ${esc(l.coordinator||"—")} · Trainer: ${esc(l.trainer||"—")}</div></div><span class="pill">${status}</span></div><div class="progress-row"><span>${n} of 11 steps completed</span><b>${p}%</b></div><div class="progress"><span style="width:${p}%"></span></div><div class="step-list">${STEP_DATA.map((st,i)=>{const s=l.steps[i]||{done:false,date:"",note:""};return `<div class="step ${s.done?"done":""}"><input type="checkbox" aria-label="Mark step ${i+1} complete" data-step="${i}" ${s.done?"checked":""}><div><label>${i+1}. ${st[0]}</label><small>${st[1]}</small><div class="step-extra"><input type="date" aria-label="Completion date for step ${i+1}" data-date="${i}" value="${esc(s.date||"")}"><input type="text" aria-label="Note for step ${i+1}" data-note="${i}" placeholder="Step note (optional)" value="${esc(s.note||"")}"></div></div></div>`}).join("")}</div><div class="card-actions"><button class="secondary" data-edit="${l.id}">Edit details</button><button class="danger" data-delete="${l.id}">Delete</button></div></article>`}).join("");
+$("learnerGrid").querySelectorAll("[data-step]").forEach(el=>el.addEventListener("change",e=>updateStep(e.target.closest(".learner-card").dataset.id,+e.target.dataset.step,{done:e.target.checked})));
+$("learnerGrid").querySelectorAll("[data-date]").forEach(el=>el.addEventListener("change",e=>updateStep(e.target.closest(".learner-card").dataset.id,+e.target.dataset.date,{date:e.target.value})));
+$("learnerGrid").querySelectorAll("[data-note]").forEach(el=>el.addEventListener("change",e=>updateStep(e.target.closest(".learner-card").dataset.id,+e.target.dataset.note,{note:e.target.value})));
+$("learnerGrid").querySelectorAll("[data-edit]").forEach(el=>el.addEventListener("click",()=>editLearner(el.dataset.edit)));
+$("learnerGrid").querySelectorAll("[data-delete]").forEach(el=>el.addEventListener("click",()=>deleteLearner(el.dataset.delete)));
+}
+async function updateStep(id,index,patch){const l=learners.find(x=>x.id===id);if(!l)return;const steps=l.steps.map((s,i)=>i===index?{...s,...patch}:s);const {error}=await supabase.from("traineeship_learners").update({steps,updated_at:new Date().toISOString()}).eq("id",id);if(error){alert("Could not save step: "+error.message);await loadLearners();return}l.steps=steps;render()}
+function openEditor(l=null){editingId=l?.id||null;$("editorTitle").textContent=l?"Edit learner details":"Add learner";$("learnerName").value=l?.learner_name||"";$("learnerId").value=l?.learner_id||"";$("startDate").value=l?.start_date||"";$("endDate").value=l?.end_date||"";$("coordinator").value=l?.coordinator||"";$("trainer").value=l?.trainer||"";$("learnerNotes").value=l?.notes||"";$("saveMsg").textContent="";$("editor").classList.remove("hidden");$("editor").scrollIntoView({behavior:"smooth"})}
+function editLearner(id){openEditor(learners.find(l=>l.id===id))}
+async function saveLearner(){const name=$("learnerName").value.trim();if(!name){$("saveMsg").textContent="Learner name is required.";return}const payload={learner_name:name,learner_id:$("learnerId").value.trim(),start_date:$("startDate").value||null,end_date:$("endDate").value||null,coordinator:$("coordinator").value.trim(),trainer:$("trainer").value.trim(),notes:$("learnerNotes").value.trim(),updated_at:new Date().toISOString()};let result;if(editingId)result=await supabase.from("traineeship_learners").update(payload).eq("id",editingId);else result=await supabase.from("traineeship_learners").insert({...payload,steps:emptySteps(),created_by:null});if(result.error){$("saveMsg").textContent=result.error.message;return} $("editor").classList.add("hidden");await loadLearners()}
+async function deleteLearner(id){const l=learners.find(x=>x.id===id);if(!l||!confirm(`Delete ${l.learner_name} and all their step history? This cannot be undone.`))return;const {error}=await supabase.from("traineeship_learners").delete().eq("id",id);if(error){alert(error.message);return}await loadLearners()}
+function exportRows(){return learners.map(l=>{const row={"Learner Name":l.learner_name,"Learner ID / CID":l.learner_id||"","Start Date":l.start_date||"","End Date":l.end_date||"","Training Coordinator":l.coordinator||"","Trainer":l.trainer||"","Progress":l.steps.filter(s=>s.done).length+"/11"};STEP_DATA.forEach((s,i)=>{row[`${i+1}. ${s[0]}`]=l.steps[i]?.done?"✓":"✗";row[`${i+1}. Completion Date`]=l.steps[i]?.date||"";row[`${i+1}. Notes`]=l.steps[i]?.note||""});row["General Notes"]=l.notes||"";return row})}
+function downloadBlob(blob,name){const a=document.createElement("a"),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
+function exportCSV(){const rows=exportRows();if(!rows.length){alert("There are no learners to export.");return}const cols=Object.keys(rows[0]),csv=[cols,...rows.map(r=>cols.map(c=>r[c]??""))].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\r\n");downloadBlob(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),"Reach_Traineeship_Tracker.csv")}
+async function exportExcel(){if(!learners.length){alert("There are no learners to export.");return}const wb=new ExcelJS.Workbook(),ws=wb.addWorksheet("Learner Tracker");const rows=exportRows(),cols=Object.keys(rows[0]);ws.addRow(cols);rows.forEach(r=>ws.addRow(cols.map(c=>r[c]??"")));ws.views=[{state:"frozen",ySplit:1,xSplit:2}];ws.autoFilter={from:{row:1,column:1},to:{row:1,column:cols.length}};ws.getRow(1).font={bold:true,color:{argb:"FFFFFFFF"}};ws.getRow(1).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF17365D"}};ws.getRow(1).alignment={vertical:"middle",wrapText:true};ws.getRow(1).height=34;ws.columns.forEach((c,i)=>{c.width=i<2?24:(i<7?18:16)});STEP_DATA.forEach((s,i)=>{const col=cols.indexOf(`${i+1}. ${s[0]}`)+1;ws.addConditionalFormatting({ref:ws.getColumn(col).letter+"2:"+ws.getColumn(col).letter+(rows.length+1),rules:[{type:"containsText",operator:"containsText",text:"✓",style:{font:{bold:true,color:{argb:"FF176B35"}},fill:{type:"pattern",pattern:"solid",bgColor:{argb:"FFE4F5E9"}}}},{type:"containsText",operator:"containsText",text:"✗",style:{font:{bold:true,color:{argb:"FFA52B22"}},fill:{type:"pattern",pattern:"solid",bgColor:{argb:"FFFDE9E7"}}}}]})});ws.eachRow((row,rn)=>{if(rn>1)row.alignment={vertical:"top",wrapText:true}});const buf=await wb.xlsx.writeBuffer();downloadBlob(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"Reach_Traineeship_Tracker.xlsx")}
+async function logout(){return}
+$("addBtn").onclick=()=>openEditor();$("saveLearner").onclick=saveLearner;$("cancelEdit").onclick=()=>$("editor").classList.add("hidden");$("search").oninput=render;$("filter").onchange=render;$("xlsxBtn").onclick=exportExcel;$("csvBtn").onclick=exportCSV;$("refreshBtn").onclick=loadLearners;$("logoutBtn").classList.add("hidden");init();
+</script>
+</body></html>
