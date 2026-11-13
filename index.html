@@ -90,26 +90,23 @@ br
 </section>
 
 <section class="panel">
-<h2>Add a learner</h2>
-<form id="addForm">
-<div class="formgrid">
-<input id="name" placeholder="Learner name *" required>
-<input id="learnerId" placeholder="Learner ID / CID">
-<input id="coordinator" placeholder="Training Coordinator">
-<input id="trainer" placeholder="Trainer">
-<input id="start" type="date" title="Start date">
-<input id="end" type="date" title="End date">
-</div>
-<textarea id="newNotes" placeholder="Notes (optional)" rows="2"></textarea>
-<div style="text-align:right;margin-top:12px">
-<button class="primary" type="submit">＋ Add learner</button>
-</div>
-</form>
+ <h2>Add a learner</h2>
+ <form id="addForm">
+ <div class="formgrid">
+ <input id="name" placeholder="Learner name *" required>
+ <input id="qualification" placeholder="Qualification">
+ <input id="occurrenceId" placeholder="Occurrence ID">
+ <input id="trainer" placeholder="Trainer">
+ <input id="employer" placeholder="Employer">
+ </div>
+ <div style="text-align:right;margin-top:12px">
+ <button class="primary" type="submit">＋ Add learner</button>
+ </div>
+ </form>
 </section>
 
 <div class="toolbar">
-<input id="search" placeholder="Search learner, ID, coordinator or trainer...">
-<select id="filter" style="width:auto">
+<input id="search" placeholder="Search learner,learner ID, qualification, occurrence ID, trainer or employer..."><select id="filter" style="width:auto">
 <option value="all">All learners</option>
 <option value="progress">In progress</option>
 <option value="complete">Completed</option>
@@ -164,7 +161,10 @@ const safe=s=>String(s??"").replace(/[&<>"']/g,c=>({
 
 function defaultSteps(){
  return stepNames.map((title,index)=>({
-  number:index+1,title,done:false,date:"",note:""
+  number:index+1,
+  title,
+  done:false,
+  note:""
  }));
 }
 
@@ -173,9 +173,9 @@ function normaliseSteps(value){
  return stepNames.map((title,index)=>{
   const old=saved.find(s=>Number(s.number)===index+1);
   return {
-   number:index+1,title,
+   number:index+1,
+   title,
    done:!!old?.done,
-   date:old?.date||"",
    note:old?.note||""
   };
  });
@@ -220,8 +220,13 @@ function render(){
 
  const shown=learners.filter(l=>{
   const p=count(l);
-  const text=[l.learner_name,l.learner_id,l.coordinator,l.trainer].join(" ").toLowerCase();
-  return text.includes(q)&&(
+ const text=[
+  l.learner_name,
+  l.qualification,
+  l.occurrence_id,
+  l.trainer,
+  l.employer
+].join(" ").toLowerCase();  return text.includes(q)&&(
    f==="all"||
    (f==="complete"&&p===11)||
    (f==="progress"&&p>0&&p<11)||
@@ -244,8 +249,9 @@ function render(){
      <div class="learner-name">${safe(l.learner_name)}</div>
      <div class="meta">
       Learner ID: ${safe(l.learner_id||"-")}<br>
-      Start: ${safe(l.start_date||"-")} · End: ${safe(l.end_date||"-")}<br>
-      Coordinator: ${safe(l.coordinator||"-")} · Trainer: ${safe(l.trainer||"-")}
+      Qualification: ${safe(l.qualification||"-")}<br>
+      Occurrence ID: ${safe(l.occurrence_id||"-")}<br>
+      Trainer: ${safe(l.trainer||"-")} · Employer: ${safe(l.employer||"-")}
      </div>
      <div class="actions">
       <button class="secondary edit" data-id="${safe(l.id)}">Edit details</button>
@@ -269,9 +275,7 @@ function render(){
         ${s.done?"checked":""}>
        <span>${s.number}. ${safe(s.title)}</span>
       </label>
-      <input type="date" class="stepdate"
-       data-id="${safe(l.id)}" data-step="${s.number}"
-       value="${safe(s.date)}" title="Completion date">
+    
       <small>${s.done?"Completed":"Pending"}</small>
      </div>
     `).join("")}
@@ -288,14 +292,15 @@ async function saveLearner(l){
  const {error}=await db.from(TABLE).update({
   learner_name:l.learner_name,
   learner_id:l.learner_id||"",
-  start_date:l.start_date||null,
-  end_date:l.end_date||null,
-  coordinator:l.coordinator||"",
+  qualification:l.qualification||"",
+  occurrence_id:l.occurrence_id||"",
   trainer:l.trainer||"",
+  employer:l.employer||"",
   notes:l.notes||"",
   steps:l.steps,
   updated_at:new Date().toISOString()
  }).eq("id",l.id);
+
  if(error)throw error;
 }
 
@@ -348,14 +353,14 @@ $("addForm").addEventListener("submit",async e=>{
  const record={
   learner_name:$("name").value.trim(),
   learner_id:$("learnerId").value.trim(),
-  start_date:$("start").value||null,
-  end_date:$("end").value||null,
-  coordinator:$("coordinator").value.trim(),
+  qualification:$("qualification").value.trim(),
+  occurrence_id:$("occurrenceId").value.trim(),
   trainer:$("trainer").value.trim(),
-  notes:$("newNotes").value.trim(),
+  employer:$("employer").value.trim(),
+  notes:"",
   steps:defaultSteps(),
   created_by:user.id
- };
+};
  if(!record.learner_name)return;
  setStatus("Adding learner...");
  const {data,error}=await db.from(TABLE).insert(record).select().single();
@@ -383,12 +388,7 @@ $("learners").addEventListener("change",async e=>{
 
  if(e.target.classList.contains("stepcheck")){
   step.done=e.target.checked;
-  if(step.done&&!step.date)step.date=new Date().toISOString().slice(0,10);
-  if(!step.done)step.date="";
- }else if(e.target.classList.contains("stepdate")){
-  step.date=e.target.value;
-  step.done=!!step.date;
- }else return;
+}else return;
 
  render();
  try{
@@ -431,13 +431,13 @@ $("learners").addEventListener("click",async e=>{
 
  if(e.target.classList.contains("edit")){
   const fields=[
-   ["learner_name","Learner name"],
-   ["learner_id","Learner ID"],
-   ["start_date","Start date"],
-   ["end_date","End date"],
-   ["coordinator","Training Coordinator"],
-   ["trainer","Trainer"]
-  ];
+ ["learner_name","Learner name"],
+ ["learner_id","Learner ID"],
+ ["qualification","Qualification"],
+ ["occurrence_id","Occurrence ID"],
+ ["trainer","Trainer"],
+ ["employer","Employer"]
+];
   const changes={};
   for(const [key,label] of fields){
    const value=prompt(label+":",l[key]||"");
@@ -467,16 +467,30 @@ $("refresh").addEventListener("click",async()=>{
 });
 
 $("export").addEventListener("click",()=>{
- const headers=[
-  "Learner","Learner ID","Start Date","End Date",
-  "Coordinator","Trainer","Completed Steps","Progress %",
-  ...stepNames,"Notes"
- ];
- const rows=learners.map(l=>[
-  l.learner_name,l.learner_id,l.start_date,l.end_date,
-  l.coordinator,l.trainer,count(l),Math.round(count(l)/11*100)+"%",
-  ...l.steps.map(s=>s.done?"Completed":"Pending"),l.notes
- ]);
+const headers=[
+  "Learner",
+  "Learner ID",
+  "Qualification",
+  "Occurrence ID",
+  "Trainer",
+  "Employer",
+  "Completed Steps",
+  "Progress %",
+  ...stepNames,
+  "Notes"
+];
+const rows=learners.map(l=>[
+  l.learner_name,
+  l.learner_ID,
+  l.qualification,
+  l.occurrence_id,
+  l.trainer,
+  l.employer,
+  count(l),
+  Math.round(count(l)/11*100)+"%",
+  ...l.steps.map(s=>s.done?"Completed":"Pending"),
+  l.notes
+]);
  const csv=[headers,...rows].map(row=>
   row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")
  ).join("\r\n");
