@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -40,17 +39,17 @@ button{border:0;border-radius:8px;padding:10px 14px;font-weight:bold;cursor:poin
 .step-list{border-top:1px solid var(--line);padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .step{background:#f7f9fc;border-radius:8px;padding:10px;font-size:13px}
 .step.done{background:#effaf5}
-.step label{display:flex;gap:8px;align-items:flex-start;font-weight:bold}
+.step label{display:flex;gap:8px;align-items:flex-start;font-weight:bold;cursor:pointer}
 .step input[type=checkbox]{width:16px;margin:1px 0;flex:none}
-.step small{display:block;color:var(--muted);margin:7px 0 0 24px;line-height:1.4}
-.step input[type=date]{margin:7px 0 0 24px;width:calc(100% - 24px);padding:6px;font-size:12px}
+.step small{display:block;color:var(--muted);margin:5px 0 0 24px;line-height:1.4}
 .notes{padding:0 16px 16px}
 .notes textarea{min-height:60px}
 .empty{text-align:center;padding:35px;background:white;border:1px dashed #cbd7e2;border-radius:12px;color:var(--muted)}
 #status{padding:10px;background:#eaf2f8;border-radius:8px;font-size:13px;margin-bottom:15px}
 #app{display:none}
 #login{max-width:430px;margin:35px auto}
-#login button{width:100%;margin-top:12px}
+#login input{margin-bottom:10px}
+#login button{width:100%;margin-top:4px}
 .hint{font-size:12px;color:var(--muted)}
 @media(max-width:700px){.stats{grid-template-columns:1fr 1fr}.formgrid{grid-template-columns:1fr 1fr}.step-list{grid-template-columns:1fr}.learner-head{flex-direction:column}.progress-wrap{width:100%;max-width:none}}
 @media(max-width:420px){.formgrid{grid-template-columns:1fr}}
@@ -70,7 +69,6 @@ button{border:0;border-radius:8px;padding:10px 14px;font-weight:bold;cursor:poin
 <h2>Team Login</h2>
 <form id="loginForm">
 <input id="email" type="email" placeholder="Email address" required>
-br
 <input id="password" type="password" placeholder="Password" required>
 <button class="primary" type="submit">Sign in</button>
 </form>
@@ -90,23 +88,26 @@ br
 </section>
 
 <section class="panel">
- <h2>Add a learner</h2>
- <form id="addForm">
- <div class="formgrid">
- <input id="name" placeholder="Learner name *" required>
- <input id="qualification" placeholder="Qualification">
- <input id="occurrenceId" placeholder="Occurrence ID">
- <input id="trainer" placeholder="Trainer">
- <input id="employer" placeholder="Employer">
- </div>
- <div style="text-align:right;margin-top:12px">
- <button class="primary" type="submit">＋ Add learner</button>
- </div>
- </form>
+<h2>Add a learner</h2>
+<form id="addForm">
+<div class="formgrid">
+<input id="name" placeholder="Learner Name *" required>
+<input id="qualification" placeholder="Qualification">
+<input id="occurrenceId" placeholder="Occurrence ID">
+<input id="tcid" placeholder="TCID">
+<input id="trainer" placeholder="Trainer">
+<input id="employer" placeholder="Employer">
+</div>
+<textarea id="newNotes" placeholder="Notes (optional)" rows="2"></textarea>
+<div style="text-align:right;margin-top:12px">
+<button class="primary" type="submit">＋ Add learner</button>
+</div>
+</form>
 </section>
 
 <div class="toolbar">
-<input id="search" placeholder="Search learner,learner ID, qualification, occurrence ID, trainer or employer..."><select id="filter" style="width:auto">
+<input id="search" placeholder="Search learner, qualification, occurrence ID, TCID, trainer or employer...">
+<select id="filter" style="width:auto">
 <option value="all">All learners</option>
 <option value="progress">In progress</option>
 <option value="complete">Completed</option>
@@ -161,10 +162,7 @@ const safe=s=>String(s??"").replace(/[&<>"']/g,c=>({
 
 function defaultSteps(){
  return stepNames.map((title,index)=>({
-  number:index+1,
-  title,
-  done:false,
-  note:""
+  number:index+1,title,done:false,note:""
  }));
 }
 
@@ -199,7 +197,8 @@ async function loadLearners(){
   .select("*").order("created_at",{ascending:false});
  if(error)throw error;
  learners=(data||[]).map(r=>({
-  ...r,steps:normaliseSteps(r.steps)
+  ...r,
+  steps:normaliseSteps(r.steps)
  }));
  render();
 }
@@ -220,13 +219,15 @@ function render(){
 
  const shown=learners.filter(l=>{
   const p=count(l);
- const text=[
-  l.learner_name,
-  l.qualification,
-  l.occurrence_id,
-  l.trainer,
-  l.employer
-].join(" ").toLowerCase();  return text.includes(q)&&(
+  const text=[
+   l.learner_name,
+   l.coordinator,
+   l.learner_id,
+   l.tcid,
+   l.trainer,
+   l.employer
+  ].join(" ").toLowerCase();
+  return text.includes(q)&&(
    f==="all"||
    (f==="complete"&&p===11)||
    (f==="progress"&&p>0&&p<11)||
@@ -248,9 +249,8 @@ function render(){
     <div style="flex:1;min-width:0">
      <div class="learner-name">${safe(l.learner_name)}</div>
      <div class="meta">
-      Learner ID: ${safe(l.learner_id||"-")}<br>
-      Qualification: ${safe(l.qualification||"-")}<br>
-      Occurrence ID: ${safe(l.occurrence_id||"-")}<br>
+      Qualification: ${safe(l.coordinator||"-")}<br>
+      Occurrence ID: ${safe(l.learner_id||"-")} · TCID: ${safe(l.tcid||"-")}<br>
       Trainer: ${safe(l.trainer||"-")} · Employer: ${safe(l.employer||"-")}
      </div>
      <div class="actions">
@@ -275,7 +275,6 @@ function render(){
         ${s.done?"checked":""}>
        <span>${s.number}. ${safe(s.title)}</span>
       </label>
-    
       <small>${s.done?"Completed":"Pending"}</small>
      </div>
     `).join("")}
@@ -291,16 +290,15 @@ function render(){
 async function saveLearner(l){
  const {error}=await db.from(TABLE).update({
   learner_name:l.learner_name,
+  coordinator:l.coordinator||"",
   learner_id:l.learner_id||"",
-  qualification:l.qualification||"",
-  occurrence_id:l.occurrence_id||"",
+  tcid:l.tcid||"",
   trainer:l.trainer||"",
   employer:l.employer||"",
   notes:l.notes||"",
   steps:l.steps,
   updated_at:new Date().toISOString()
  }).eq("id",l.id);
-
  if(error)throw error;
 }
 
@@ -352,15 +350,15 @@ $("addForm").addEventListener("submit",async e=>{
  e.preventDefault();
  const record={
   learner_name:$("name").value.trim(),
-  learner_id:$("learnerId").value.trim(),
-  qualification:$("qualification").value.trim(),
-  occurrence_id:$("occurrenceId").value.trim(),
+  coordinator:$("qualification").value.trim(),
+  learner_id:$("occurrenceId").value.trim(),
+  tcid:$("tcid").value.trim(),
   trainer:$("trainer").value.trim(),
   employer:$("employer").value.trim(),
-  notes:"",
+  notes:$("newNotes").value.trim(),
   steps:defaultSteps(),
   created_by:user.id
-};
+ };
  if(!record.learner_name)return;
  setStatus("Adding learner...");
  const {data,error}=await db.from(TABLE).insert(record).select().single();
@@ -376,6 +374,7 @@ $("addForm").addEventListener("submit",async e=>{
 });
 
 $("learners").addEventListener("change",async e=>{
+ if(!e.target.classList.contains("stepcheck"))return;
  const id=e.target.dataset.id;
  const l=learners.find(x=>x.id===id);
  if(!l)return;
@@ -385,10 +384,7 @@ $("learners").addEventListener("change",async e=>{
  if(!step)return;
 
  const previous={...step};
-
- if(e.target.classList.contains("stepcheck")){
-  step.done=e.target.checked;
-}else return;
+ step.done=e.target.checked;
 
  render();
  try{
@@ -431,23 +427,21 @@ $("learners").addEventListener("click",async e=>{
 
  if(e.target.classList.contains("edit")){
   const fields=[
- ["learner_name","Learner name"],
- ["learner_id","Learner ID"],
- ["qualification","Qualification"],
- ["occurrence_id","Occurrence ID"],
- ["trainer","Trainer"],
- ["employer","Employer"]
-];
+   ["learner_name","Learner Name"],
+   ["coordinator","Qualification"],
+   ["learner_id","Occurrence ID"],
+   ["tcid","TCID"],
+   ["trainer","Trainer"],
+   ["employer","Employer"]
+  ];
   const changes={};
   for(const [key,label] of fields){
    const value=prompt(label+":",l[key]||"");
    if(value===null)return;
    changes[key]=value.trim();
   }
-  if(!changes.learner_name){alert("Learner name is required.");return;}
+  if(!changes.learner_name){alert("Learner Name is required.");return;}
   Object.assign(l,changes);
-  l.start_date=l.start_date||null;
-  l.end_date=l.end_date||null;
   try{
    await saveLearner(l);
    render();
@@ -467,30 +461,16 @@ $("refresh").addEventListener("click",async()=>{
 });
 
 $("export").addEventListener("click",()=>{
-const headers=[
-  "Learner",
-  "Learner ID",
-  "Qualification",
-  "Occurrence ID",
-  "Trainer",
-  "Employer",
-  "Completed Steps",
-  "Progress %",
-  ...stepNames,
-  "Notes"
-];
-const rows=learners.map(l=>[
-  l.learner_name,
-  l.learner_ID,
-  l.qualification,
-  l.occurrence_id,
-  l.trainer,
-  l.employer,
-  count(l),
-  Math.round(count(l)/11*100)+"%",
-  ...l.steps.map(s=>s.done?"Completed":"Pending"),
-  l.notes
-]);
+ const headers=[
+  "Learner Name","Qualification","Occurrence ID","TCID",
+  "Trainer","Employer","Completed Steps","Progress %",
+  ...stepNames,"Notes"
+ ];
+ const rows=learners.map(l=>[
+  l.learner_name,l.coordinator,l.learner_id,l.tcid,
+  l.trainer,l.employer,count(l),Math.round(count(l)/11*100)+"%",
+  ...l.steps.map(s=>s.done?"Completed":"Pending"),l.notes
+ ]);
  const csv=[headers,...rows].map(row=>
   row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")
  ).join("\r\n");
